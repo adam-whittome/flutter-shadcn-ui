@@ -132,7 +132,7 @@ class ShadResizableController extends ChangeNotifier {
   /// Returns the result of the resize operation:
   /// - If the resize operation is successful, the panel info will be updated
   /// - If the resize operation is unsuccessful, the panel info will not b
-  /// updated and the result will be [ShadResizeResult.failedLeading or
+  /// updated and the result will be [ShadResizeResult.failedLeading] or
   /// [ShadResizeResult.failedTrailing] depending on the resize direction
   ShadResizeResult resize({
     required int index,
@@ -141,8 +141,8 @@ class ShadResizableController extends ChangeNotifier {
     final leadingPanelInfo = getPanelInfo(index);
     final trailingPanelInfo = getPanelInfo(index + 1);
     final newLeadingSize = size;
-    final offset = (-((leadingPanelInfo.size - newLeadingSize) *
-            (totalAvailableWidth * base)))
+    final offset = ((newLeadingSize - leadingPanelInfo.size) *
+            totalAvailableWidth * base)
         .asFixed(6);
     final newTrailingSize =
         (trailingPanelInfo.size * totalAvailableWidth - offset) /
@@ -424,12 +424,22 @@ class ShadResizablePanelGroupState extends State<ShadResizablePanelGroup> {
 
   ShadPanelInfo getPanelInfo(int index) => controller.getPanelInfo(index);
 
+  double getSeparatorOffset(int index) {
+    return controller.panelsInfo.sublist(0, index + 1)
+        .map((panelInfo) => panelInfo.size)
+        .fold<double>(0, (accumulator, size) => accumulator + size);
+  }
+
   void onHandleDrag({
     required int index,
-    required Offset offset,
+    required DragUpdateDetails details,
   }) {
-    final axisOffset =
-        (widget.axis == Axis.horizontal ? offset.dx : offset.dy).asFixed(6);
+    final localMouseOffset = details.globalPosition -
+        (context.findRenderObject()! as RenderBox).localToGlobal(Offset.zero);
+    final axisOffset = ((widget.axis == Axis.horizontal) ?
+        localMouseOffset.dx : localMouseOffset.dy) -
+        getSeparatorOffset(index) *  controller.totalAvailableWidth
+        .asFixed(6);
     final leadingPanelInfo = getPanelInfo(index);
     final newLeadingSize =
         (leadingPanelInfo.size * controller.totalAvailableWidth + axisOffset) /
@@ -633,7 +643,7 @@ class ShadResizablePanelGroupState extends State<ShadResizablePanelGroup> {
                         isHorizontal ? dragging.value = false : null,
                     onHorizontalDragUpdate: (details) => isHorizontal
                         ? onHandleDrag(
-                            offset: details.delta,
+                            details: details,
                             index: i,
                           )
                         : null,
@@ -645,7 +655,7 @@ class ShadResizablePanelGroupState extends State<ShadResizablePanelGroup> {
                         isVertical ? dragging.value = false : null,
                     onVerticalDragUpdate: (details) => isVertical
                         ? onHandleDrag(
-                            offset: details.delta,
+                            details: details,
                             index: i,
                           )
                         : null,
